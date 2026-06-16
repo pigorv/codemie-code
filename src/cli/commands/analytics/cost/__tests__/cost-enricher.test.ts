@@ -221,7 +221,7 @@ describe('enrichCosts', () => {
 });
 
 describe('acceptance: TTL-aware pricing against real transcripts', () => {
-  const BASE = `${process.env.HOME}/.claude/projects/-Users-Ihor-Prysiazhnyi-Personal-oss-codemie-code`;
+  const BASE = `${process.env.HOME}/.claude/projects/${process.cwd().replace(/[/_]/g, '-')}`;
 
   // Skip in CI — real transcripts are only available locally.
   const itLocal = process.env.CI ? it.skip : it;
@@ -231,6 +231,7 @@ describe('acceptance: TTL-aware pricing against real transcripts', () => {
       sessionId,
       agentSessionFile: filePath,
       startEvent: { agentName, data: { startTime } },
+      deltas: [],
     };
   }
 
