@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { enrichCosts, buildCostSeries, type EnricherDeps } from '../cost-enricher.js';
+import { enrichCosts, buildCostSeries, realDeps, type EnricherDeps } from '../cost-enricher.js';
 import { MAX_SERIES_POINTS } from '../types.js';
 import type { UsageRecord } from '../usage-readers.js';
 
@@ -217,6 +217,42 @@ describe('enrichCosts', () => {
     expect(index.get('A')!.costUSD).toBeCloseTo(3, 6); // earliest session owns it — via its sub-agent
     expect(index.get('B')!.costUSD).toBe(0); // replay deduped
     expect(summary.totalCostUSD).toBeCloseTo(3, 6);
+  });
+});
+
+describe('acceptance: TTL-aware pricing against real transcripts', () => {
+  const BASE = `${process.env.HOME}/.claude/projects/-Users-Ihor-Prysiazhnyi-Personal-oss-codemie-code`;
+
+  // Skip in CI — real transcripts are only available locally.
+  const itLocal = process.env.CI ? it.skip : it;
+
+  function sessionEntry(sessionId: string, filePath: string, agentName = 'claude', startTime = 1) {
+    return {
+      sessionId,
+      agentSessionFile: filePath,
+      startEvent: { agentName, data: { startTime } },
+    };
+  }
+
+  itLocal('session 6e8bfbe2: TTL-aware pricing yields the correct total', async () => {
+    const sessions = [
+      sessionEntry('6e8bfbe2-7a9a-4b1d-800b-ae72ee6dec9d', `${BASE}/6e8bfbe2-7a9a-4b1d-800b-ae72ee6dec9d.jsonl`),
+      sessionEntry('agent-a66f1ecadbe8beed6', `${BASE}/6e8bfbe2-7a9a-4b1d-800b-ae72ee6dec9d/subagents/agent-a66f1ecadbe8beed6.jsonl`, 'claude', 2),
+    ];
+    const { index } = await enrichCosts(sessions, realDeps);
+    const total = [...index.values()].reduce((s, c) => s + c.costUSD, 0);
+    expect(total).toBeCloseTo(4.88435635, 3);
+  });
+
+  itLocal('session d3128339: TTL-aware pricing yields the correct total', async () => {
+    const sessions = [
+      sessionEntry('d3128339-ed05-41d5-98b0-2a89932b4d3b', `${BASE}/d3128339-ed05-41d5-98b0-2a89932b4d3b.jsonl`),
+      sessionEntry('agent-a0444580f67c6ec00', `${BASE}/d3128339-ed05-41d5-98b0-2a89932b4d3b/subagents/agent-a0444580f67c6ec00.jsonl`, 'claude', 2),
+      sessionEntry('agent-a2b09a8c62ba62d84', `${BASE}/d3128339-ed05-41d5-98b0-2a89932b4d3b/subagents/agent-a2b09a8c62ba62d84.jsonl`, 'claude', 3),
+    ];
+    const { index } = await enrichCosts(sessions, realDeps);
+    const total = [...index.values()].reduce((s, c) => s + c.costUSD, 0);
+    expect(total).toBeCloseTo(1.27628500, 3);
   });
 });
 
